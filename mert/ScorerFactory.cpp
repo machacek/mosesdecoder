@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include "Scorer.h"
 #include "BleuScorer.h"
+#include "SegranksScorer.h"
 #include "BleuDocScorer.h"
 #include "PerScorer.h"
 #include "TerScorer.h"
@@ -32,6 +33,7 @@ vector<string> ScorerFactory::getTypes()
   types.push_back(string("SEMPOS"));
   types.push_back(string("LRSCORE"));
   types.push_back(string("METEOR"));
+  types.push_back(string("SEGRANKS"));
   return types;
 }
 
@@ -56,6 +58,8 @@ Scorer* ScorerFactory::getScorer(const string& type, const string& config)
     return (PermutationScorer*) new PermutationScorer(type, config);
   } else if (type == "METEOR") {
     return new MeteorScorer(config);
+  } else if (type == "SEGRANKS") {
+    return new SegranksScorer(config);
   } else {
     if (type.find(',') != string::npos) {
       return new InterpolatedScorer(type, config);

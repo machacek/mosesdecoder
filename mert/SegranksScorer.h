@@ -4,6 +4,7 @@
 //#include <ostream>
 #include <string>
 #include <vector>
+#include <Python.h>
 
 #include "Types.h"
 #include "ScoreData.h"
@@ -31,10 +32,11 @@ public:
   }
 
 protected:
-
-  // no copying allowed
   SegranksScorer(const SegranksScorer&);
   SegranksScorer& operator=(const SegranksScorer&);
+
+private:
+  PyObject* segranks_scorer;
 };
 
 }

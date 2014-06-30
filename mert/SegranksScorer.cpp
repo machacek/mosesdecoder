@@ -27,9 +27,28 @@ using namespace std;
 namespace MosesTuning
 {
 SegranksScorer::SegranksScorer(const string& config)
-  : StatisticsBasedScorer("SEGRANKS", config)
+  : StatisticsBasedScorer("SEGRANKS", config),
+    segranks_scorer(NULL)
 {
+    char* path_to_segranks = "/home/mmachace/diplomka/segranks";
+    
+    Py_SetProgramName("SegranksScorer");
     Py_Initialize();
+    
+    PyObject* sys_module_name = PyString_FromString("sys");
+    PyObject* sys_module = PyImport_Import(sys_module_name);
+    Py_DECREF(sys_module_name);
+    PyObject* path_object = PyObject_GetAttrString(sys_module, "path")
+    
+    PyObject* segranks_module_name = PyString_FromString("segranks");
+    PyObject* segranks_module = PyImport_Import(segranks_module_name);
+    Py_DECREF(segranks_module_name);
+
+
+    if (module == NULL) {
+        cerr << "Cannot import module" << endl;
+        return;
+    }
 }
 
 SegranksScorer::~SegranksScorer() {

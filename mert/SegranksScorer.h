@@ -24,6 +24,7 @@ public:
 
   virtual void setReferenceFiles(const std::vector<std::string>& referenceFiles);
   virtual void prepareStats(std::size_t sid, const std::string& text, ScoreStats& entry);
+  virtual void prepareStatsVector(std::size_t sid, const std::string& text, std::vector<int>& stats);
   virtual statscore_t calculateScore(const std::vector<int>& comps) const;
   virtual std::size_t NumberOfScores() const {
     return 2;

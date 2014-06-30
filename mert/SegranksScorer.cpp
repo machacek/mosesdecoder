@@ -1,5 +1,7 @@
 #include "SegranksScorer.h"
 
+#include <Python.h>
+
 /*
 #include <algorithm>
 #include <cassert>

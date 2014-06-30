@@ -1,5 +1,10 @@
 import testing ;
 
+project
+    : requirements <include>/usr/include/python2.7
+    : usage-requirements <include>/usr/include/python2.7
+    ;
+
 lib m ;
 
 lib mert_lib :

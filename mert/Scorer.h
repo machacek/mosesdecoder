@@ -153,6 +153,10 @@ protected:
   ScoreData* m_score_data;
   bool m_enable_preserve_case;
 
+  std::map<std::string, std::string>& getConfigMap() {
+      return m_config;
+  }
+
   /**
    * Get value of config variable. If not provided, return default.
    */

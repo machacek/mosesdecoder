@@ -2,6 +2,8 @@
 
 #include <Python.h>
 #include <iostream>
+#include <map>
+#include <string>
 
 /*
 #include <algorithm>
@@ -35,23 +37,74 @@ SegranksScorer::SegranksScorer(const string& config)
     Py_SetProgramName("SegranksScorer");
     Py_Initialize();
     
-    PyObject* sys_module_name = PyString_FromString("sys");
-    PyObject* sys_module = PyImport_Import(sys_module_name);
-    Py_DECREF(sys_module_name);
-    PyObject* path_object = PyObject_GetAttrString(sys_module, "path")
-    
-    PyObject* segranks_module_name = PyString_FromString("segranks");
+    /*
+     * Adding path to segranks module to sys.path
+     */
+    PyObject* path_object = PySys_GetObject("path");
+    PyObject* path_to_segranks_object = PyString_FromString(path_to_segranks);
+    if (PyList_Append(path_object, path_to_segranks_object)) {
+        cerr << "Cannot append path to sys.path" << endl;
+        return;
+    }
+    Py_DECREF(path_to_segranks_object);
+
+    /*
+     * Importing segrank_scorer module
+     */
+    PyObject* segranks_module_name = PyString_FromString("segranks.segranks_scorer");
     PyObject* segranks_module = PyImport_Import(segranks_module_name);
     Py_DECREF(segranks_module_name);
 
-
-    if (module == NULL) {
+    if (segranks_module == NULL) {
         cerr << "Cannot import module" << endl;
         return;
     }
+
+    /*
+     * Creating config dictionary
+     */
+    map<string,string>& configMap = getConfigMap();
+    PyObject* configDict = PyDict_New();
+    for (map<string,string>::iterator it = configMap.begin(); it != configMap.end(); ++it) {
+        const char* key = it->first.c_str();
+        PyObject* value = PyString_FromString(it->second.c_str());
+        cerr << "Inserting key " << key << " with value " << it->second << endl;
+        if (PyDict_SetItemString(configDict, key, value)) {
+            cerr << "Cannot insert key " << key << " with value " << it->second << endl;
+        }
+        Py_DECREF(value);
+    }
+
+    /*
+     * Creating scorer instance
+     */
+    PyObject* scorer_class = PyObject_GetAttrString(segranks_module, "SegranksScorer");
+    if(scorer_class == NULL) {
+        cerr << "Cannot get SegranksScorer class" << endl;
+    }
+    if(PyType_Check(scorer_class)) {
+        cerr << "PyType returned true" << endl;
+    } else {
+        cerr << "PyType returned false" << endl;
+    }
+    this->segranks_scorer = PyObject_Call(scorer_class, NULL, NULL);
+    if(this->segranks_scorer == NULL) {
+        cerr << "Cannot create segranks scorer instance" << endl;
+        if (PyErr_Occurred()) {
+            PyErr_Print();
+        }
+    }
+    else
+    {
+        PyObject* repr = PyObject_Repr(this->segranks_scorer);
+        cerr << PyString_AsString(repr) << endl;
+    }
+    Py_DECREF(configDict);
+    Py_DECREF(scorer_class);
 }
 
 SegranksScorer::~SegranksScorer() {
+    Py_DECREF(this->segranks_scorer);
     Py_Finalize();
 }
 

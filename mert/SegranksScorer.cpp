@@ -4,6 +4,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <stdlib.h>
 
 /*
 #include <algorithm>
@@ -28,11 +29,22 @@ using namespace std;
 
 namespace MosesTuning
 {
+
+void check_for(const char* message) {
+    if (PyErr_Occurred()){
+        PyErr_Print();
+        cerr << message << endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+
 SegranksScorer::SegranksScorer(const string& config)
   : StatisticsBasedScorer("SEGRANKS", config),
-    segranks_scorer(NULL)
+    python_scorer(NULL)
 {
     char* path_to_segranks = "/home/mmachace/diplomka/segranks";
+    char* module_name = "segranks.segranks_scorer";
     
     Py_SetProgramName("SegranksScorer");
     Py_Initialize();
@@ -42,23 +54,17 @@ SegranksScorer::SegranksScorer(const string& config)
      */
     PyObject* path_object = PySys_GetObject("path");
     PyObject* path_to_segranks_object = PyString_FromString(path_to_segranks);
-    if (PyList_Append(path_object, path_to_segranks_object)) {
-        cerr << "Cannot append path to sys.path" << endl;
-        return;
-    }
-    Py_DECREF(path_to_segranks_object);
+    PyList_Append(path_object, path_to_segranks_object);
+    check_for("Cannot append to sys.path");
+
 
     /*
      * Importing segrank_scorer module
      */
-    PyObject* segranks_module_name = PyString_FromString("segranks.segranks_scorer");
+    PyObject* segranks_module_name = PyString_FromString(module_name);
     PyObject* segranks_module = PyImport_Import(segranks_module_name);
-    Py_DECREF(segranks_module_name);
+    check_for("Cannot import python module");
 
-    if (segranks_module == NULL) {
-        cerr << "Cannot import module" << endl;
-        return;
-    }
 
     /*
      * Creating config dictionary
@@ -68,43 +74,33 @@ SegranksScorer::SegranksScorer(const string& config)
     for (map<string,string>::iterator it = configMap.begin(); it != configMap.end(); ++it) {
         const char* key = it->first.c_str();
         PyObject* value = PyString_FromString(it->second.c_str());
-        cerr << "Inserting key " << key << " with value " << it->second << endl;
-        if (PyDict_SetItemString(configDict, key, value)) {
-            cerr << "Cannot insert key " << key << " with value " << it->second << endl;
-        }
         Py_DECREF(value);
     }
 
     /*
      * Creating scorer instance
      */
-    PyObject* scorer_class = PyObject_GetAttrString(segranks_module, "SegranksScorer");
-    if(scorer_class == NULL) {
-        cerr << "Cannot get SegranksScorer class" << endl;
-    }
-    if(PyType_Check(scorer_class)) {
-        cerr << "PyType returned true" << endl;
-    } else {
-        cerr << "PyType returned false" << endl;
-    }
-    this->segranks_scorer = PyObject_Call(scorer_class, NULL, NULL);
-    if(this->segranks_scorer == NULL) {
-        cerr << "Cannot create segranks scorer instance" << endl;
-        if (PyErr_Occurred()) {
-            PyErr_Print();
-        }
-    }
-    else
-    {
-        PyObject* repr = PyObject_Repr(this->segranks_scorer);
-        cerr << PyString_AsString(repr) << endl;
-    }
+    PyObject* scorer_class = PyObject_GetAttrString(segranks_module, "Scorer");
+    check_for("Cannot get Scorer class");
+    PyObject* emptyTuple = PyTuple_New(0);
+    this->python_scorer = PyObject_Call(scorer_class, emptyTuple, configDict);
+    check_for("Cannot create Scorer instance");
+
+    /*
+     * Cleaning
+     */
+    Py_DECREF(path_to_segranks_object);
+    Py_DECREF(segranks_module_name);
+    Py_DECREF(segranks_module);
     Py_DECREF(configDict);
+    Py_DECREF(emptyTuple);
     Py_DECREF(scorer_class);
 }
 
 SegranksScorer::~SegranksScorer() {
-    Py_DECREF(this->segranks_scorer);
+    if (this->python_scorer) {
+        Py_DECREF(this->python_scorer);
+    }
     Py_Finalize();
 }
 
@@ -128,9 +124,40 @@ void SegranksScorer::prepareStatsVector(size_t sid, const string& text, vector<i
 
 statscore_t SegranksScorer::calculateScore(const vector<int>& comps) const
 {
-    cout << "comps[0]: " << comps[0] << " comps[1]: " << comps[1] << endl;
-    double result = comps[0];
-    result /= comps[1];
+    /*
+     * Prepare list of components
+     */
+    int n = comps.size();
+    PyObject* comps_list = PyList_New(n);
+    for (int i = 0; i < n; ++i) {
+        PyList_SetItem(comps_list, i, PyInt_FromLong(comps[i]));
+    }
+
+    PyObject* score = PyObject_CallMethod(this->python_scorer, "calculate_score", "(O)", comps_list);
+    check_for("Python calculate_score method failed");
+
+    double result = PyFloat_AsDouble(score);
+    check_for("Python calculate_score method did not return float");
+
+    /*
+     * Cleanup
+     */
+    Py_DECREF(comps_list);
+    Py_DECREF(score);
+
     return result;
 }
+
+size_t SegranksScorer::NumberOfScores() const
+{
+    PyObject* number_of_scores = PyObject_CallMethod(this->python_scorer, "number_of_scores", NULL);
+    check_for("Python method number_of_scores failed");
+
+    int result = (int) PyInt_AsLong(number_of_scores);
+    check_for("Python method number_of_scores did not return int");
+
+    Py_DECREF(number_of_scores);
+    return result;
+}
+
 }

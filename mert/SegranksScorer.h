@@ -27,16 +27,14 @@ public:
   virtual void prepareStats(std::size_t sid, const std::string& text, ScoreStats& entry);
   virtual void prepareStatsVector(std::size_t sid, const std::string& text, std::vector<int>& stats);
   virtual statscore_t calculateScore(const std::vector<int>& comps) const;
-  virtual std::size_t NumberOfScores() const {
-    return 2;
-  }
+  virtual std::size_t NumberOfScores() const;
 
 protected:
   SegranksScorer(const SegranksScorer&);
   SegranksScorer& operator=(const SegranksScorer&);
 
 private:
-  PyObject* segranks_scorer;
+  PyObject* python_scorer;
 };
 
 }

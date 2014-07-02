@@ -118,8 +118,24 @@ void SegranksScorer::prepareStats(size_t sid, const string& text, ScoreStats& en
 
 void SegranksScorer::prepareStatsVector(size_t sid, const string& text, vector<int>& stats)
 {
-    stats.push_back(1);
-    stats.push_back(2);
+    PyObject* py_stats = PyObject_CallMethod(this->python_scorer, "prepare_stats", "is", sid, text.c_str());
+    check_for("Python prepare_stats method failed");
+
+    int n = PySequence_Length(py_stats);
+    check_for("Python prepare_stats method did not return sequence");
+
+    for (int i = 0; i < n; ++i) {
+        PyObject* item = PySequence_GetItem(py_stats, i);
+        int stat = PyInt_AsLong(item);
+        check_for("Python prepare_stats method has to return integer sequence");
+        stats.push_back(stat);
+        Py_DECREF(item);
+    }
+
+    /*
+     * Cleaning
+     */
+    Py_DECREF(py_stats);
 }
 
 statscore_t SegranksScorer::calculateScore(const vector<int>& comps) const

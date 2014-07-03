@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 #include <stdlib.h>
+#include "Util.h"
 
 /*
 #include <algorithm>
@@ -19,7 +20,6 @@
 #include "util/exception.hh"
 #include "Ngram.h"
 #include "Reference.h"
-#include "Util.h"
 #include "ScoreDataIterator.h"
 #include "FeatureDataIterator.h"
 #include "Vocabulary.h"
@@ -38,10 +38,19 @@ void check_for(const char* message) {
     }
 }
 
+PyObject* to_python_unicode(const string& s) {
+    PyObject* python_string = PyString_FromString(s.c_str());
+    PyObject* python_unicode = PyObject_CallMethod(python_string, "decode", "(s)", "utf-8");
+    Py_DECREF(python_string);
+    return python_unicode;
+}
+
 
 SegranksScorer::SegranksScorer(const string& config)
   : StatisticsBasedScorer("SEGRANKS", config),
-    python_scorer(NULL)
+    python_scorer(NULL),
+    m_number_of_scores(0),
+    m_use_alignment(false)
 {
     char* path_to_segranks = "/home/mmachace/diplomka/segranks";
     char* module_name = "segranks.segranks_scorer";
@@ -74,6 +83,7 @@ SegranksScorer::SegranksScorer(const string& config)
     for (map<string,string>::iterator it = configMap.begin(); it != configMap.end(); ++it) {
         const char* key = it->first.c_str();
         PyObject* value = PyString_FromString(it->second.c_str());
+        PyDict_SetItemString(configDict, key, value);
         Py_DECREF(value);
     }
 
@@ -87,6 +97,22 @@ SegranksScorer::SegranksScorer(const string& config)
     check_for("Cannot create Scorer instance");
 
     /*
+     * Caching number of scores
+     */
+    PyObject* number_of_scores = PyObject_CallMethod(this->python_scorer, "number_of_scores", NULL);
+    check_for("Python method number_of_scores failed");
+    this->m_number_of_scores = (int) PyInt_AsLong(number_of_scores);
+    check_for("Python method number_of_scores did not return int");
+
+    /*
+     * Caching whther the scorer uses alignment
+     */
+    PyObject* use_alignment = PyObject_CallMethod(this->python_scorer, "use_alignment", NULL);
+    check_for("Python method use_alignment failed");
+    this->m_use_alignment = (bool) PyObject_IsTrue(use_alignment);
+    check_for("Python method use_alignment did not return bool");
+
+    /*
      * Cleaning
      */
     Py_DECREF(path_to_segranks_object);
@@ -95,6 +121,8 @@ SegranksScorer::SegranksScorer(const string& config)
     Py_DECREF(configDict);
     Py_DECREF(emptyTuple);
     Py_DECREF(scorer_class);
+    Py_DECREF(number_of_scores);
+    Py_DECREF(use_alignment);
 }
 
 SegranksScorer::~SegranksScorer() {
@@ -118,7 +146,31 @@ void SegranksScorer::prepareStats(size_t sid, const string& text, ScoreStats& en
 
 void SegranksScorer::prepareStatsVector(size_t sid, const string& text, vector<int>& stats)
 {
-    PyObject* py_stats = PyObject_CallMethod(this->python_scorer, "prepare_stats", "is", sid, text.c_str());
+    PyObject* py_stats;
+    if (this->useAlignment()) {
+        string sentence = "";
+        string align = text;
+        size_t alignmentData = text.find("|||");
+        //Get sentence and alignment parts
+        if(alignmentData != string::npos) {
+            getNextPound(align,sentence, "|||");
+        } else {
+            cerr << "Text to prepare stats does not contain |||" << endl;
+            exit(EXIT_FAILURE);
+        }
+        PyObject* sentence_unicode = to_python_unicode(sentence);
+        PyObject* align_unicode = to_python_unicode(align);
+        py_stats = PyObject_CallMethod(this->python_scorer, "prepare_stats", "iOO", sid, sentence_unicode, align_unicode);
+        Py_DECREF(sentence_unicode);
+        Py_DECREF(align_unicode);
+    } 
+    else 
+    {
+        PyObject* sentence_unicode = to_python_unicode(text);
+        py_stats = PyObject_CallMethod(this->python_scorer, "prepare_stats", "iO", sid, sentence_unicode);
+        Py_DECREF(sentence_unicode);
+    }
+
     check_for("Python prepare_stats method failed");
 
     int n = PySequence_Length(py_stats);
@@ -161,18 +213,6 @@ statscore_t SegranksScorer::calculateScore(const vector<int>& comps) const
     Py_DECREF(comps_list);
     Py_DECREF(score);
 
-    return result;
-}
-
-size_t SegranksScorer::NumberOfScores() const
-{
-    PyObject* number_of_scores = PyObject_CallMethod(this->python_scorer, "number_of_scores", NULL);
-    check_for("Python method number_of_scores failed");
-
-    int result = (int) PyInt_AsLong(number_of_scores);
-    check_for("Python method number_of_scores did not return int");
-
-    Py_DECREF(number_of_scores);
     return result;
 }
 

@@ -52,7 +52,7 @@ SegranksScorer::SegranksScorer(const string& config)
     m_number_of_scores(0),
     m_use_alignment(false)
 {
-    char* path_to_segranks = "/home/mmachace/diplomka/segranks";
+    char* path_to_segranks = "/home/machacek/diplomka/segranks";
     char* module_name = "segranks.segranks_scorer";
     
     Py_SetProgramName("SegranksScorer");

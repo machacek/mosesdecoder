@@ -2,12 +2,17 @@ import testing ;
 
 project
     : requirements
-        <include>/usr/include/python2.7
-    : usage-requirements <include>/usr/include/python2.7
+        <include>/opt/python/2.7.1/include/python2.7
+        <linkflags>-Xlinker
+        <linkflags>-export-dynamic
+    : usage-requirements <include>/opt/python/2.7.1/include/python2.7
     ;
 
 lib m ;
-lib python : : <file>/usr/lib/python2.7/config-x86_64-linux-gnu/libpython2.7.so ;
+
+lib python : : <file>/opt/python/2.7.1/lib/python2.7/config/libpython2.7.a ;
+
+lib libutil : : <file>/usr/lib/libutil.a ;
 
 lib mert_lib :
 Util.cpp
@@ -58,7 +63,7 @@ SentenceLevelScorer.cpp
 Permutation.cpp
 PermutationScorer.cpp
 StatisticsBasedScorer.cpp
-../util//kenutil m python ..//z ;
+../util//kenutil m python libutil ..//z ;
 
 exe mert : mert.cpp mert_lib ../moses//ThreadPool ;
 

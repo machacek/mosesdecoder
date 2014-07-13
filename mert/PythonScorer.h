@@ -1,5 +1,5 @@
-#ifndef MERT_SEGRANKS_SCORER_H_
-#define MERT_SEGRANKS_SCORER_H_
+#ifndef MERT_PYTHON_SCORER_H_
+#define MERT_PYTHON_SCORER_H_
 
 //#include <ostream>
 #include <string>
@@ -17,11 +17,11 @@ namespace MosesTuning
 /**
  * Bleu scoring
  */
-class SegranksScorer: public StatisticsBasedScorer
+class PythonScorer: public StatisticsBasedScorer
 {
 public:
-  explicit SegranksScorer(const std::string& config);
-  ~SegranksScorer();
+  explicit PythonScorer(const std::string& config);
+  ~PythonScorer();
 
   virtual void setReferenceFiles(const std::vector<std::string>& referenceFiles);
   virtual void prepareStats(std::size_t sid, const std::string& text, ScoreStats& entry);
@@ -31,8 +31,8 @@ public:
   virtual bool useAlignment() const{ return this->m_use_alignment; }
 
 protected:
-  SegranksScorer(const SegranksScorer&);
-  SegranksScorer& operator=(const SegranksScorer&);
+  PythonScorer(const PythonScorer&);
+  PythonScorer& operator=(const PythonScorer&);
 
 private:
   PyObject* python_scorer;
@@ -42,4 +42,4 @@ private:
 
 }
 
-#endif  // MERT_SEGRANKS_SCORER_H_
+#endif  // MERT_PYTHON_SCORER_H_

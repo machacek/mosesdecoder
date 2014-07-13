@@ -1,4 +1,4 @@
-#include "SegranksScorer.h"
+#include "PythonScorer.h"
 
 #include <Python.h>
 #include <iostream>
@@ -46,32 +46,32 @@ PyObject* to_python_unicode(const string& s) {
 }
 
 
-SegranksScorer::SegranksScorer(const string& config)
+PythonScorer::PythonScorer(const string& config)
   : StatisticsBasedScorer("SEGRANKS", config),
     python_scorer(NULL),
     m_number_of_scores(0),
     m_use_alignment(false)
 {
-    char* path_to_segranks = "/home/machacek/diplomka/segranks";
-    char* module_name = "segranks.segranks_scorer";
+    const string path = getConfig("path","");
+    const string module_name = getConfig("module","");
     
-    Py_SetProgramName("SegranksScorer");
+    Py_SetProgramName("PythonScorer");
     Py_Initialize();
     
     /*
-     * Adding path to segranks module to sys.path
+     * Adding path to python module to sys.path
      */
     PyObject* path_object = PySys_GetObject("path");
-    PyObject* path_to_segranks_object = PyString_FromString(path_to_segranks);
-    PyList_Append(path_object, path_to_segranks_object);
+    PyObject* path_to_add_object = PyString_FromString(path.c_str());
+    PyList_Append(path_object, path_to_add_object);
     check_for("Cannot append to sys.path");
 
 
     /*
-     * Importing segrank_scorer module
+     * Importing python module
      */
-    PyObject* segranks_module_name = PyString_FromString(module_name);
-    PyObject* segranks_module = PyImport_Import(segranks_module_name);
+    PyObject* python_module_name = PyString_FromString(module_name.c_str());
+    PyObject* module = PyImport_Import(python_module_name);
     check_for("Cannot import python module");
 
 
@@ -90,7 +90,7 @@ SegranksScorer::SegranksScorer(const string& config)
     /*
      * Creating scorer instance
      */
-    PyObject* scorer_class = PyObject_GetAttrString(segranks_module, "Scorer");
+    PyObject* scorer_class = PyObject_GetAttrString(module, "Scorer");
     check_for("Cannot get Scorer class");
     PyObject* emptyTuple = PyTuple_New(0);
     this->python_scorer = PyObject_Call(scorer_class, emptyTuple, configDict);
@@ -115,9 +115,9 @@ SegranksScorer::SegranksScorer(const string& config)
     /*
      * Cleaning
      */
-    Py_DECREF(path_to_segranks_object);
-    Py_DECREF(segranks_module_name);
-    Py_DECREF(segranks_module);
+    Py_DECREF(path_to_add_object);
+    Py_DECREF(python_module_name);
+    Py_DECREF(module);
     Py_DECREF(configDict);
     Py_DECREF(emptyTuple);
     Py_DECREF(scorer_class);
@@ -125,18 +125,35 @@ SegranksScorer::SegranksScorer(const string& config)
     Py_DECREF(use_alignment);
 }
 
-SegranksScorer::~SegranksScorer() {
+PythonScorer::~PythonScorer() {
     if (this->python_scorer) {
         Py_DECREF(this->python_scorer);
     }
     Py_Finalize();
 }
 
-void SegranksScorer::setReferenceFiles(const vector<string>& referenceFiles)
+void PythonScorer::setReferenceFiles(const vector<string>& referenceFiles)
 {
+    /*
+     * Prepare list of reference files
+     */
+    int n = referenceFiles.size();
+    PyObject* list = PyList_New(n);
+    for (int i = 0; i < n; ++i) {
+        PyList_SetItem(list, i, PyString_FromString(referenceFiles[i].c_str()));
+    }
+
+    PyObject* result = PyObject_CallMethod(this->python_scorer, "set_reference_files", "(O)", list);
+    check_for("Python set_reference_files method failed");
+
+    /*
+     * Cleanup
+     */
+    Py_DECREF(list);
+    Py_DECREF(result);
 }
 
-void SegranksScorer::prepareStats(size_t sid, const string& text, ScoreStats& entry)
+void PythonScorer::prepareStats(size_t sid, const string& text, ScoreStats& entry)
 {
   string sentence = this->preprocessSentence(text);
   vector<int> stats;
@@ -144,7 +161,7 @@ void SegranksScorer::prepareStats(size_t sid, const string& text, ScoreStats& en
   entry.set(stats);
 }
 
-void SegranksScorer::prepareStatsVector(size_t sid, const string& text, vector<int>& stats)
+void PythonScorer::prepareStatsVector(size_t sid, const string& text, vector<int>& stats)
 {
     PyObject* py_stats;
     if (this->useAlignment()) {
@@ -190,7 +207,7 @@ void SegranksScorer::prepareStatsVector(size_t sid, const string& text, vector<i
     Py_DECREF(py_stats);
 }
 
-statscore_t SegranksScorer::calculateScore(const vector<int>& comps) const
+statscore_t PythonScorer::calculateScore(const vector<int>& comps) const
 {
     /*
      * Prepare list of components
